@@ -1,17 +1,24 @@
 FROM ubuntu:22.04
 
-# Install tmate and dependencies
-RUN apt-get update && \
-    apt-get install -y tmate openssh-client && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+ENV DEBIAN_FRONTEND=noninteractive
 
-# Set root password (though tmate uses its own keys/session links)
+# 1. Install tmate and Docker CLI
+RUN apt-get update && \
+    apt-get install -y tmate docker.io curl openssh-client && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# 2. Set root password (optional for tmate, but good for local use)
 RUN echo 'root:DXF!@#1014..' | chpasswd
 
-# Tmate uses outgoing connections to its servers, 
-# so usually no EXPOSE ports are required unless you run a local tmate-slave.
-# However, we'll keep it clean.
+# 3. Startup script to show the Termius link and keep container alive
+RUN echo '#!/bin/bash\n\
+tmate -S /tmp/tmate.sock new-session -d\n\
+tmate -S /tmp/tmate.sock wait tmate-ready\n\
+echo "------------------------------------------"\n\
+echo "--- COPY THIS SSH ADDRESS FOR TERMIUS ---"\n\
+tmate -S /tmp/tmate.sock display -p "#{tmate_ssh}"\n\
+echo "------------------------------------------"\n\
+tail -f /dev/null' > /startup.sh && chmod +x /startup.sh
 
-# Start tmate in "foreground" mode and print the connection details to logs
-CMD ["tmate", "-F"]
+CMD ["/startup.sh"]
